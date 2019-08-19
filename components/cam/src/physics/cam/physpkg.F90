@@ -94,7 +94,7 @@ module physpkg
   logical           :: pergro_test_active= .false.
   logical           :: pergro_mods = .false.
   logical           :: is_cmip6_volc !true if cmip6 style volcanic file is read otherwise false
-
+  logical           :: macmic_extra_diag
   !======================================================================= 
 contains
 
@@ -172,7 +172,8 @@ subroutine phys_register
                       state_debug_checks_out   = state_debug_checks, &
                       micro_do_icesupersat_out = micro_do_icesupersat, &
                       pergro_test_active_out   = pergro_test_active, &
-                      pergro_mods_out          = pergro_mods)
+                      pergro_mods_out          = pergro_mods,&
+                      macmic_extra_diag_out        = macmic_extra_diag)
     ! Initialize dyn_time_lvls
     call pbuf_init_time()
 
@@ -1153,7 +1154,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     
    !BSINGH -  addfld and adddefault calls for perturb growth testing    
     if(pergro_test_active)call add_fld_default_calls()
-
+    if(macmic_extra_diag) call add_fld_extra_macmic_calls()
 end subroutine phys_init
 
   !
@@ -2133,7 +2134,13 @@ subroutine tphysbc (ztodt,               &
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
 
     integer :: nstep                          ! current timestep number
+    integer :: ixnumliq,ixnpccn!! index; add temporary variable for MACMIC output
+    real(r8), pointer :: tmpnpccn(:,:)
+    real(r8):: tmpcldliq(pcols,pver),tmpnumliq(pcols,pver)!add temporary variable for MACMIC output
 
+    character(200) :: npccnname                !String for npccn name at each sub step
+    character(200) :: numliqname               !String for numliq name at each sub step
+    character(200) :: cldliqname               !String for cldliq name at each sub step
     real(r8) :: net_flx(pcols)
 
     real(r8) :: zdu(pcols,pver)               ! detraining mass flux from deep convection
@@ -2653,7 +2660,7 @@ end if
        snow_pcw_macmic = 0._r8
 
        do macmic_it = 1, cld_macmic_num_steps
-
+       
         if (l_st_mac) then
 
           if (micro_do_icesupersat) then 
@@ -2662,7 +2669,7 @@ end if
             ! Aerosol Activation
             !===================================================
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo)
+            call microp_aero_run(state, ptend, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
             call t_stopf('microp_aero_run')
 
             call physics_ptend_scale(ptend, 1._r8/cld_macmic_num_steps, ncol)
@@ -2752,7 +2759,23 @@ end if
 
           call t_stopf('macrop_tend')
         end if ! l_st_mac
+        if(macmic_extra_diag)then!! add extra diagnostic variables
+              ixnpccn=pbuf_get_index('NPCCN')
+              write(npccnname,"(A17,I2.2)")"npccn_bf_micaero_",macmic_it
+              call pbuf_get_field(pbuf,ixnpccn,tmpnpccn)
+              call outfld(trim(adjustl(npccnname)),   tmpnpccn(:ncol,:pver), pcols, lchnk )
 
+              call cnst_get_ind('CLDLIQ',ixcldliq)
+              call cnst_get_ind('NUMLIQ',ixnumliq)
+
+              write (numliqname,"(A18,I2.2)") "numliq_bf_micaero_", macmic_it
+              write (cldliqname,"(A18,I2.2)") "cldliq_bf_micaero_", macmic_it
+              tmpnumliq(:ncol,:pver)=state%q(:ncol,:pver,ixnumliq)
+              tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+
+              call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+              call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+          end if !! end if macmic output npccn  
           !===================================================
           ! Calculate cloud microphysics 
           !===================================================
@@ -2773,10 +2796,27 @@ end if
           if (.not. micro_do_icesupersat) then 
 
             call t_startf('microp_aero_run')
-            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo)
+            call microp_aero_run(state, ptend_aero, cld_macmic_ztodt, pbuf, lcldo, macmic_it)
             call t_stopf('microp_aero_run')
 
-          endif
+          end if
+          if(macmic_extra_diag)then!! add extra diagnostic variables
+              ixnpccn=pbuf_get_index('NPCCN')
+              write(npccnname,"(A17,I2.2)")"npccn_af_micaero_",macmic_it
+              call pbuf_get_field(pbuf,ixnpccn,tmpnpccn)
+              call outfld(trim(adjustl(npccnname)),   tmpnpccn, pcols, lchnk )
+
+              call cnst_get_ind('CLDLIQ',ixcldliq)
+              call cnst_get_ind('NUMLIQ',ixnumliq)
+
+              write (numliqname,"(A18,I2.2)") "numliq_af_micaero_", macmic_it
+              write (cldliqname,"(A18,I2.2)") "cldliq_af_micaero_", macmic_it
+              tmpnumliq(:ncol,:pver)=state%q(:ncol,:pver,ixnumliq)
+              tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+
+              call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+              call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+          end if !! end if macmic output npccn   
 
           call t_startf('microp_tend')
 
@@ -2833,6 +2873,19 @@ end if
           snow_pcw = 0._r8
 
         end if ! l_st_mic
+
+        if(macmic_extra_diag)then!! add output macmic diagnostic variables
+            call cnst_get_ind('CLDLIQ',ixcldliq)
+            call cnst_get_ind('NUMLIQ',ixnumliq)
+
+            write (numliqname,"(A18,I2.2)") "numliq_af_mg2tend_", macmic_it
+            write (cldliqname,"(A18,I2.2)") "cldliq_af_mg2tend_", macmic_it
+            tmpnumliq(:ncol,:pver)=state%q(:ncol,:pver,ixnumliq)
+            tmpcldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
+
+            call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
+            call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+        end if    
 
           prec_sed_macmic(:ncol) = prec_sed_macmic(:ncol) + prec_sed(:ncol)
           snow_sed_macmic(:ncol) = snow_sed_macmic(:ncol) + snow_sed(:ncol)
@@ -3178,5 +3231,72 @@ subroutine add_fld_default_calls()
   enddo
 
 end subroutine add_fld_default_calls
+subroutine add_fld_extra_macmic_calls ()
+  !SZHANG -  For adding addfld and add defualt calls
+  use cam_history,        only: addfld, add_default, fieldname_len
 
+  implicit none
+  integer           :: cld_macmic_num_steps
+!  character (len=6),parameter::hist_vars(5) = (/'NPCCN ','NUMLIQ','NUMICE','CLDLIQ','CLDICE'/)
+!  character (len=35),parameter::long_names(5)= (/'numlid tendency due to mic_aero    ',&
+!                                              'cloud liquid number concentration  ',&
+!                                              'cloud ice number concentration     ',&
+!                                              'cloud liquid mass mixing ratio     ',&
+!                                              'cloud ice mass mixing ratio        '/)
+!  character (len=5),parameter::units(5)     = (/'#/kg/s ',  '#/m3 ', '#/m3 '  ,'kg/kg' ,'kg/kg'/) 
+  !Add all existing ptend names for the addfld calls
+  character(len=20), parameter :: vlist(108) = (/     'npccn_bf_micaero_01 '                       ,&
+       'npccn_bf_micaero_02 ','npccn_bf_micaero_03 ','npccn_bf_micaero_04 ','npccn_bf_micaero_05 ',&
+       'npccn_bf_micaero_06 ','numliq_bf_micaero_01','numliq_bf_micaero_02','numliq_bf_micaero_03',&
+       'numliq_bf_micaero_04','numliq_bf_micaero_05','numliq_bf_micaero_06','cldliq_bf_micaero_01',&
+       'cldliq_bf_micaero_02','cldliq_bf_micaero_03','cldliq_bf_micaero_04','cldliq_bf_micaero_05',&
+       'cldliq_bf_micaero_06','npccn_af_micaero_01 ','npccn_af_micaero_02 ','npccn_af_micaero_03 ',&
+       'npccn_af_micaero_04 ','npccn_af_micaero_05 ','npccn_af_micaero_06 ','numliq_af_micaero_01',&
+       'numliq_af_micaero_02','numliq_af_micaero_03','numliq_af_micaero_04','numliq_af_micaero_05',&
+       'numliq_af_micaero_06','cldliq_af_micaero_01','cldliq_af_micaero_02','cldliq_af_micaero_03',&
+       'cldliq_af_micaero_04','cldliq_af_micaero_05','cldliq_af_micaero_06','npccn_af_mg2tend_01 ',&
+       'npccn_af_mg2tend_02 ','npccn_af_mg2tend_03 ','npccn_af_mg2tend_04 ','npccn_af_mg2tend_05 ',&
+       'npccn_af_mg2tend_06 ','numliq_af_mg2tend_01','numliq_af_mg2tend_02','numliq_af_mg2tend_03',&
+       'numliq_af_mg2tend_04','numliq_af_mg2tend_05','numliq_af_mg2tend_06','cldliq_af_mg2tend_01',&
+       'cldliq_af_mg2tend_02','cldliq_af_mg2tend_03','cldliq_af_mg2tend_04','cldliq_af_mg2tend_05',&
+       'cldliq_af_mg2tend_06','numliq_bf_reg_01    ','numliq_bf_reg_02    ','numliq_bf_reg_03    ',&
+       'numliq_bf_reg_04    ','numliq_bf_reg_05    ','numliq_bf_reg_06    ','numliq_af_reg_01    ',&
+       'numliq_af_reg_02    ','numliq_af_reg_03    ','numliq_af_reg_04    ','numliq_af_reg_05    ',&
+       'numliq_af_reg_06    ','numliq_bf_mix_01    ','numliq_bf_mix_02    ','numliq_bf_mix_03    ',&
+       'numliq_bf_mix_04    ','numliq_bf_mix_05    ','numliq_bf_mix_06    ','numliq_af_mix_01    ',&
+       'numliq_af_mix_02    ','numliq_af_mix_03    ','numliq_af_mix_04    ','numliq_af_mix_05    ',&
+       'numliq_af_mix_06    ','nsource_bf_mix_01   ','nsource_bf_mix_02   ','nsource_bf_mix_03   ',&
+       'nsource_bf_mix_04   ','nsource_bf_mix_05   ','nsource_bf_mix_06   ','nsource_af_mix_01   ',&
+       'nsource_af_mix_02   ','nsource_af_mix_03   ','nsource_af_mix_04   ','nsource_af_mix_05   ',&
+       'nsource_af_mix_06   ','factnum_01          ','factnum_02          ','factnum_03          ',&
+       'factnum_04          ','factnum_05          ','factnum_06          ','wtke_01             ',&
+       'wtke_02             ','wtke_03             ','wtke_04             ','wtke_05             ',&
+       'wtke_06             ','nsource_af_reg_01   ','nsource_af_reg_02   ','nsource_af_reg_03   ',&
+       'nsource_af_reg_04   ','nsource_af_reg_05   ','nsource_af_reg_06   '/)
+
+!  character(len=10),parameter::vlist(3)  =(/'bf_micaero','af_micaero','af_mg2tend'/)
+  character(len=fieldname_len) :: varname
+  character(len=2)::substep
+  character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
+
+  integer :: it,ip, ntot, iv,nvars
+
+  ntot = size(vlist)
+ ! nvars=size(hist_vars)
+ ! do iv = 1, nvars
+    do iv=1, ntot
+    varname  = trim(adjustl(vlist(iv))) ! form variable name  !trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist(iv))) ! form variable name
+
+        call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
+ !     do it = 1, cld_macmic_num_steps
+ !       write(substep,"(I2.2)")it
+ !       varname  = trim(adjustl(hist_vars(iv)))//'_'//trim(adjustl(vlist(ip)))//'_'//trim(adjustl(substep)) ! form variable name
+
+ !       call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', trim(adjustl(units(iv))), trim(adjustl(long_names(iv))),flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
+        call add_default (trim(adjustl(varname)), 1, ' ')
+      enddo
+!    enddo
+!enddo
+
+end subroutine add_fld_extra_macmic_calls
 end module physpkg

@@ -298,7 +298,7 @@ end subroutine ndrop_init
 
 subroutine dropmixnuc( &
    state, ptend, dtmicro, pbuf, wsub, &
-   cldn, cldo, tendnd, factnum)
+   cldn, cldo, tendnd, factnum, macmic_it)
 
    ! vertical diffusion and nucleation of cloud droplets
    ! assume cloud presence controlled by cloud fraction
@@ -325,7 +325,8 @@ subroutine dropmixnuc( &
 
    integer  :: lchnk               ! chunk identifier
    integer  :: ncol                ! number of columns
-   integer  :: loop_up_bnd         
+   integer  :: loop_up_bnd        
+   integer,intent(in)  :: macmic_it
    real(r8), pointer :: ncldwtr(:,:) ! droplet number concentration (#/kg)
    real(r8), pointer :: temp(:,:)    ! temperature (K)
    real(r8), pointer :: omega(:,:)   ! vertical velocity (Pa/s)
@@ -371,6 +372,11 @@ subroutine dropmixnuc( &
    real(r8) :: wtke(pcols,pver)     ! turbulent vertical velocity at base of layer k (m/s)
    real(r8) :: wtke_cen(pcols,pver) ! turbulent vertical velocity at center of layer k (m/s)
    real(r8) :: wbar, wmix, wmin, wmax
+   real(r8) :: numliq_bf_reg(pcols,pver),numliq_af_reg(pcols,pver)
+   real(r8) :: numliq_bf_mix(pcols,pver),numliq_af_mix(pcols,pver)
+   real(r8) :: nsource_af_reg(pcols,pver)
+   real(r8) :: nsource_bf_mix(pcols,pver),nsource_af_mix(pcols,pver)
+   character(len=20)::tmpname
 
    real(r8) :: zn(pver)   ! g/pdel (m2/g) for layer
    real(r8) :: flxconv    ! convergence of flux into lowest layer
@@ -528,6 +534,7 @@ subroutine dropmixnuc( &
       do k = top_lev, pver
 
          qcld(k)  = ncldwtr(i,k)
+
          qncld(k) = 0._r8
          srcn(k)  = 0._r8
          cs(i,k)  = pmid(i,k)/(rair*temp(i,k))        ! air density (kg/m3)
@@ -579,6 +586,7 @@ subroutine dropmixnuc( &
             raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
          end do
       end do
+      numliq_bf_reg(i,:)=qcld(:pver)
 
       ! droplet nucleation/aerosol activation
 
@@ -687,7 +695,8 @@ subroutine dropmixnuc( &
 
       enddo  ! grow_shrink_main_k_loop
       ! end of k-loop for growing/shrinking cloud calcs ......................
-
+      numliq_af_reg(i,:)=qcld(:pver)
+      nsource_af_reg(i,:)=nsource(i,:)
       ! ......................................................................
       ! start of k-loop for calc of old cloud activation tendencies ..........
       !
@@ -938,7 +947,9 @@ subroutine dropmixnuc( &
             mact(k,m) = min( mact(k,m), ekkp(k) )
          end do
       end do
-
+     
+      numliq_bf_mix(i,:)=qcld(:pver)
+      nsource_bf_mix(i,:)=nsource(i,:)
 
       ! old_cloud_nsubmix_loop
       do n = 1, nsubmix
@@ -1023,7 +1034,8 @@ subroutine dropmixnuc( &
          end do
 
       end do ! old_cloud_nsubmix_loop
-
+      numliq_af_mix(i,:)=qcld(:pver)
+      nsource_af_mix(i,:)=nsource(i,:)
       ! evaporate particles again if no cloud
 
       do k = top_lev, pver
@@ -1084,6 +1096,30 @@ subroutine dropmixnuc( &
 
    end do  ! overall_main_i_loop
    ! end of main loop over i/longitude ....................................
+!   !!for numliq
+!   write (tmpname, "(A14,I2.2)") "numliq_bf_reg_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   numliq_bf_reg, pcols, lchnk )
+!   write (tmpname, "(A14,I2.2)") "numliq_af_reg_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   numliq_af_reg, pcols, lchnk )
+!   write (tmpname, "(A14,I2.2)") "numliq_bf_mix_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   numliq_bf_mix, pcols, lchnk )
+!   write (tmpname, "(A14,I2.2)") "numliq_af_mix_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   numliq_af_mix, pcols, lchnk )
+!
+!   !!for nsource
+!   write (tmpname, "(A15,I2.2)") "nsource_af_reg_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   nsource_af_reg, pcols, lchnk )
+!   write (tmpname, "(A15,I2.2)") "nsource_bf_mix_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   nsource_bf_mix, pcols, lchnk )
+!   write (tmpname, "(A15,I2.2)") "nsource_af_mix_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   nsource_af_mix, pcols, lchnk )
+!
+!   !! fore ndropmix
+!   write (tmpname, "(A5,I2.2)") "wtke_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   wtke, pcols, lchnk )
+!   !! for factnum
+!   write (tmpname, "(A8,I2.2)") "factnum_", macmic_it
+!   call outfld(trim(adjustl(tmpname)),   factnum, pcols, lchnk )
 
    call outfld('NDROPCOL', ndropcol, pcols, lchnk)
    call outfld('NDROPSRC', nsource,  pcols, lchnk)

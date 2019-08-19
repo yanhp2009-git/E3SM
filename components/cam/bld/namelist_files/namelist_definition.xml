@@ -2761,6 +2761,11 @@ Default: FALSE
 Switch for output CLUBB initial conditions
 Default: FALSE
 </entry>
+<entry id="macmic_extra_diag" type="logical" category="conv"
+       group="phys_ctl_nl" valid_values="" >
+Switch for MACMIC substep diag
+Default: FALSE
+</entry>
 
 <entry id="do_aerocom_ind3" type="logical" category="conv"
        group="phys_ctl_nl" valid_values="" >

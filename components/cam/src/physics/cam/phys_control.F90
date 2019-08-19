@@ -96,6 +96,7 @@ logical           :: history_clubb        = .true.     ! output default CLUBB-re
 logical           :: do_clubb_sgs
 logical           :: do_clubb_int
 logical           :: do_output_clubb_int
+logical           :: macmic_extra_diag    = .false.    ! for invoking macmic extra diagnose
 logical           :: do_aerocom_ind3      = .false.    ! true to write aerocom
 real(r8)          :: prc_coef1            = huge(1.0_r8)
 real(r8)          :: prc_exp              = huge(1.0_r8)
@@ -180,6 +181,7 @@ subroutine phys_ctl_readnl(nlfile)
       history_aerosol, history_aero_optics, &
       history_eddy, history_budget,  history_budget_histfile_num, history_waccm, &
       conv_water_in_rad, history_clubb, do_clubb_sgs, do_clubb_int, do_output_clubb_int, &
+      macmic_extra_diag,&
       do_tms, state_debug_checks, &
       use_mass_borrower, do_aerocom_ind3, &
       l_ieflx_fix, &
@@ -237,6 +239,7 @@ subroutine phys_ctl_readnl(nlfile)
    call mpibcast(do_clubb_sgs,                    1 , mpilog,  0, mpicom)
    call mpibcast(do_clubb_int,                    1 , mpilog,  0, mpicom)
    call mpibcast(do_output_clubb_int,             1 , mpilog,  0, mpicom)
+   call mpibcast(macmic_extra_diag,               1 , mpilog,  0, mpicom)
    call mpibcast(do_aerocom_ind3,                 1 , mpilog,  0, mpicom)
    call mpibcast(conv_water_in_rad,               1 , mpiint,  0, mpicom)
    call mpibcast(do_tms,                          1 , mpilog,  0, mpicom)
@@ -416,6 +419,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
                         history_clubb_out, ieflx_opt_out, conv_water_in_rad_out, cam_chempkg_out, &
                         prog_modal_aero_out, macrop_scheme_out, &
                         do_clubb_sgs_out, do_clubb_int_out, do_output_clubb_int_out, &
+                        macmic_extra_diag_out,&
                         do_tms_out, state_debug_checks_out, &
                         do_aerocom_ind3_out,  &
                         use_mass_borrower_out, & 
@@ -460,6 +464,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    logical,           intent(out), optional :: do_clubb_sgs_out
    logical,           intent(out), optional :: do_clubb_int_out
    logical,           intent(out), optional :: do_output_clubb_int_out
+   logical,           intent(out), optional :: macmic_extra_diag_out
    logical,           intent(out), optional :: do_aerocom_ind3_out
    logical,           intent(out), optional :: micro_do_icesupersat_out
    integer,           intent(out), optional :: ieflx_opt_out
@@ -528,6 +533,7 @@ subroutine phys_getopts(deep_scheme_out, shallow_scheme_out, eddy_scheme_out, &
    if ( present(do_clubb_sgs_out        ) ) do_clubb_sgs_out         = do_clubb_sgs
    if ( present(do_clubb_int_out        ) ) do_clubb_int_out         = do_clubb_int
    if ( present(do_output_clubb_int_out ) ) do_output_clubb_int_out  = do_output_clubb_int
+   if ( present(macmic_extra_diag_out   ) ) macmic_extra_diag_out        = macmic_extra_diag
    if ( present(do_aerocom_ind3_out ) ) do_aerocom_ind3_out = do_aerocom_ind3
    if ( present(micro_do_icesupersat_out )) micro_do_icesupersat_out = micro_do_icesupersat
    if ( present(conv_water_in_rad_out   ) ) conv_water_in_rad_out    = conv_water_in_rad
