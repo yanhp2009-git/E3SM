@@ -3234,69 +3234,61 @@ end subroutine add_fld_default_calls
 subroutine add_fld_extra_macmic_calls ()
   !SZHANG -  For adding addfld and add defualt calls
   use cam_history,        only: addfld, add_default, fieldname_len
-
+  use rad_constituents, only: rad_cnst_get_info
+  use phys_control,     only: phys_getopts
   implicit none
   integer           :: cld_macmic_num_steps
-!  character (len=6),parameter::hist_vars(5) = (/'NPCCN ','NUMLIQ','NUMICE','CLDLIQ','CLDICE'/)
-!  character (len=35),parameter::long_names(5)= (/'numlid tendency due to mic_aero    ',&
-!                                              'cloud liquid number concentration  ',&
-!                                              'cloud ice number concentration     ',&
-!                                              'cloud liquid mass mixing ratio     ',&
-!                                              'cloud ice mass mixing ratio        '/)
-!  character (len=5),parameter::units(5)     = (/'#/kg/s ',  '#/m3 ', '#/m3 '  ,'kg/kg' ,'kg/kg'/) 
-  !Add all existing ptend names for the addfld calls
-  character(len=20), parameter :: vlist(108) = (/     'npccn_bf_micaero_01 '                       ,&
-       'npccn_bf_micaero_02 ','npccn_bf_micaero_03 ','npccn_bf_micaero_04 ','npccn_bf_micaero_05 ',&
-       'npccn_bf_micaero_06 ','numliq_bf_micaero_01','numliq_bf_micaero_02','numliq_bf_micaero_03',&
-       'numliq_bf_micaero_04','numliq_bf_micaero_05','numliq_bf_micaero_06','cldliq_bf_micaero_01',&
-       'cldliq_bf_micaero_02','cldliq_bf_micaero_03','cldliq_bf_micaero_04','cldliq_bf_micaero_05',&
-       'cldliq_bf_micaero_06','npccn_af_micaero_01 ','npccn_af_micaero_02 ','npccn_af_micaero_03 ',&
-       'npccn_af_micaero_04 ','npccn_af_micaero_05 ','npccn_af_micaero_06 ','numliq_af_micaero_01',&
-       'numliq_af_micaero_02','numliq_af_micaero_03','numliq_af_micaero_04','numliq_af_micaero_05',&
-       'numliq_af_micaero_06','cldliq_af_micaero_01','cldliq_af_micaero_02','cldliq_af_micaero_03',&
-       'cldliq_af_micaero_04','cldliq_af_micaero_05','cldliq_af_micaero_06','npccn_af_mg2tend_01 ',&
-       'npccn_af_mg2tend_02 ','npccn_af_mg2tend_03 ','npccn_af_mg2tend_04 ','npccn_af_mg2tend_05 ',&
-       'npccn_af_mg2tend_06 ','numliq_af_mg2tend_01','numliq_af_mg2tend_02','numliq_af_mg2tend_03',&
-       'numliq_af_mg2tend_04','numliq_af_mg2tend_05','numliq_af_mg2tend_06','cldliq_af_mg2tend_01',&
-       'cldliq_af_mg2tend_02','cldliq_af_mg2tend_03','cldliq_af_mg2tend_04','cldliq_af_mg2tend_05',&
-       'cldliq_af_mg2tend_06','numliq_bf_reg_01    ','numliq_bf_reg_02    ','numliq_bf_reg_03    ',&
-       'numliq_bf_reg_04    ','numliq_bf_reg_05    ','numliq_bf_reg_06    ','numliq_af_reg_01    ',&
-       'numliq_af_reg_02    ','numliq_af_reg_03    ','numliq_af_reg_04    ','numliq_af_reg_05    ',&
-       'numliq_af_reg_06    ','numliq_bf_mix_01    ','numliq_bf_mix_02    ','numliq_bf_mix_03    ',&
-       'numliq_bf_mix_04    ','numliq_bf_mix_05    ','numliq_bf_mix_06    ','numliq_af_mix_01    ',&
-       'numliq_af_mix_02    ','numliq_af_mix_03    ','numliq_af_mix_04    ','numliq_af_mix_05    ',&
-       'numliq_af_mix_06    ','nsource_bf_mix_01   ','nsource_bf_mix_02   ','nsource_bf_mix_03   ',&
-       'nsource_bf_mix_04   ','nsource_bf_mix_05   ','nsource_bf_mix_06   ','nsource_af_mix_01   ',&
-       'nsource_af_mix_02   ','nsource_af_mix_03   ','nsource_af_mix_04   ','nsource_af_mix_05   ',&
-       'nsource_af_mix_06   ','factnum_01          ','factnum_02          ','factnum_03          ',&
-       'factnum_04          ','factnum_05          ','factnum_06          ','wtke_01             ',&
-       'wtke_02             ','wtke_03             ','wtke_04             ','wtke_05             ',&
-       'wtke_06             ','nsource_af_reg_01   ','nsource_af_reg_02   ','nsource_af_reg_03   ',&
-       'nsource_af_reg_04   ','nsource_af_reg_05   ','nsource_af_reg_06   '/)
+  character(len=17), parameter :: vlist(19) = (/ 'npccn_bf_micaero ','npccn_af_micaero ','npccn_af_mg2tend ',&
+          'numliq_bf_micaero','numliq_af_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_micaero',&
+          'cldliq_af_mg2tend','numliq_bf_reg    ','numliq_af_reg    ','numliq_bf_mix    ','numliq_af_mix    ',&
+          'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
+          'wtke             '/)
 
 !  character(len=10),parameter::vlist(3)  =(/'bf_micaero','af_micaero','af_mg2tend'/)
   character(len=fieldname_len) :: varname
   character(len=2)::substep
   character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
-
-  integer :: it,ip, ntot, iv,nvars
-
+  
+  integer :: it,ip, ntot, iv,m,ntot_amode
+  call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps) 
   ntot = size(vlist)
- ! nvars=size(hist_vars)
- ! do iv = 1, nvars
-    do iv=1, ntot
-    varname  = trim(adjustl(vlist(iv))) ! form variable name  !trim(adjustl(hist_vars(ihist)))//'_'//trim(adjustl(vlist(iv))) ! form variable name
+  do it=1,cld_macmic_num_steps
+  write(substep,"(I2.2)")it
+  do iv=1, ntot
+    varname  = trim(adjustl(vlist(iv)))//'_'//substep ! form variable name  !
 
         call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
- !     do it = 1, cld_macmic_num_steps
- !       write(substep,"(I2.2)")it
- !       varname  = trim(adjustl(hist_vars(iv)))//'_'//trim(adjustl(vlist(ip)))//'_'//trim(adjustl(substep)) ! form variable name
-
- !       call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', trim(adjustl(units(iv))), trim(adjustl(long_names(iv))),flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
         call add_default (trim(adjustl(varname)), 1, ' ')
       enddo
-!    enddo
+enddo
 !enddo
+  call rad_cnst_get_info(0, nmodes=ntot_amode) 
+do it=1,cld_macmic_num_steps
+  !;write(substep,"(I2.2)")it
+  do m=1,ntot_amode
+   write(varname,"(A13,I1.1,A1,I2.2)")'fn_af_reg_mam',m,'_',it
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+   call add_default (trim(adjustl(varname)), 1, ' ')
+   write(varname,"(A13,I1.1,A1,I2.2)")'fn_bf_mix_mam',m,'_',it
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+   call add_default (trim(adjustl(varname)), 1, ' ')
+
+   write(varname,"(A11,I1.1,A1,I2.2)")'factnum_mam',m,'_',it
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+   call add_default (trim(adjustl(varname)), 1, ' ')
+   write(varname,"(A16,I1.1,A1,I2.2)")'raero_af_reg_mam',m,'_',it
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+   call add_default (trim(adjustl(varname)), 1, ' ')
+   write(varname,"(A15,I1.1,A1,I2.2)")'raero_cw_af_mam',m,'_',it
+   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+   call add_default (trim(adjustl(varname)), 1, ' ')
+  end do
+end do 
+
+ 
+
+
+
 
 end subroutine add_fld_extra_macmic_calls
 end module physpkg
