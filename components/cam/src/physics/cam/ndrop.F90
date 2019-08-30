@@ -411,8 +411,7 @@ subroutine dropmixnuc( &
 
    real(r8), allocatable :: raercol(:,:,:)    ! single column of aerosol mass, number mixing ratios
    real(r8), allocatable :: raercol_cw(:,:,:) ! same as raercol but for cloud-borne phase
-   real(r8), allocatable :: raero_af_reg(:,:,:)
-   real(r8), allocatable :: raero_cw_af_reg(:,:,:)
+   real(r8), allocatable :: raerfld(:,:,:)
    
    real(r8) :: na(pcols), va(pcols), hy(pcols)
    real(r8), allocatable :: naermod(:)  ! (1/m3)
@@ -420,6 +419,7 @@ subroutine dropmixnuc( &
    real(r8), allocatable :: vaerosol(:) ! interstit+activated aerosol volume conc (cm3/cm3)
    real(r8), allocatable :: fn_af_reg(:,:,:)
    real(r8), allocatable :: fn_bf_mix(:,:,:)
+   real(r8), allocatable :: flxn_bf_mix(:,:,:)
    real(r8) :: source(pver)
 
    real(r8), allocatable :: fn(:)              ! activation fraction for aerosol number
@@ -446,7 +446,8 @@ subroutine dropmixnuc( &
    integer  :: idx1000
    logical  :: zmflag
    logical  :: macmic_extra_diag
-   
+   logical  :: grow_shrink_flag=.false.
+   logical  :: old_cloud_loop_flag=.false.
    !-------------------------------------------------------------------------------
    call phys_getopts(macmic_extra_diag_out = macmic_extra_diag) 
    sq2pi = sqrt(2._r8*pi)
@@ -503,8 +504,8 @@ subroutine dropmixnuc( &
       fluxm(ntot_amode),               &
       fn_af_reg(pcols,pver,ntot_amode),&
       fn_bf_mix(pcols,pver,ntot_amode),&
-      raero_af_reg(pcols,pver,ntot_amode),&
-      raero_cw_af_reg(pcols,pver,ntot_amode))
+      flxn_bf_mix(pcols,pver,ntot_amode),&
+      raerfld(pcols,pver,ntot_amode))
 
    ! Init pointers to mode number and specie mass mixing ratios in 
    ! intersitial and cloud borne phases.
@@ -522,9 +523,9 @@ subroutine dropmixnuc( &
    factnum = 0._r8
    fn_af_reg=0._r8
    fn_bf_mix=0._r8
+   flxn_bf_mix=0._r8
    wtke    = 0._r8
-   raero_af_reg=0._r8
-   raero_cw_af_reg=0._r8
+   raerfld=0._r8
    if (prog_modal_aero) then
       ! aerosol tendencies
       call physics_ptend_init(ptend, state%psetcols, 'ndrop_aero', lq=lq)
@@ -598,7 +599,7 @@ subroutine dropmixnuc( &
             raercol(top_lev:pver,mm,nsav)    = raer(mm)%fld(i,top_lev:pver)
          end do
       end do
-      numliq_bf_reg(i,:)=qcld(:pver)
+      numliq_bf_reg(i,:)=qcld(:)
 
       ! droplet nucleation/aerosol activation
 
@@ -608,6 +609,8 @@ subroutine dropmixnuc( &
 
       ! k-loop for growing/shrinking cloud calcs .............................
       ! grow_shrink_main_k_loop: &
+      if(grow_shrink_flag)then!! add a flag control turning on/off this loop by yanhp
+
       do k = top_lev, pver
 
          ! shrinking cloud ......................................................
@@ -692,12 +695,11 @@ subroutine dropmixnuc( &
             do m = 1, ntot_amode
                mm = mam_idx(m,0)
                dact   = dumc*fn(m)*raer(mm)%fld(i,k) ! interstitial only
+               raerfld(i,k,m)=raer(mm)%fld(i,k)
                qcld(k) = qcld(k) + dact
                nsource(i,k) = nsource(i,k) + dact*dtinv
                raercol_cw(k,mm,nsav) = raercol_cw(k,mm,nsav) + dact  ! cloud-borne aerosol
                raercol(k,mm,nsav)    = raercol(k,mm,nsav) - dact
-               raero_cw_af_reg(i,k,m)=raercol_cw(k,mm,nsav)
-               raero_af_reg(i,k,m)=raercol(k,mm,nsav)
                dum = dumc*fm(m)
                do l = 1, nspec_amode(m)
                   mm = mam_idx(m,l)
@@ -709,8 +711,9 @@ subroutine dropmixnuc( &
          endif
 
       enddo  ! grow_shrink_main_k_loop
+  end if
       ! end of k-loop for growing/shrinking cloud calcs ......................
-      numliq_af_reg(i,:)=qcld(:pver)
+      numliq_af_reg(i,:)=qcld(:)
       nsource_af_reg(i,:)=nsource(i,:)
       ! ......................................................................
       ! start of k-loop for calc of old cloud activation tendencies ..........
@@ -723,6 +726,7 @@ subroutine dropmixnuc( &
       !       so they are incorrectly depleted with no replacement
 
       ! old_cloud_main_k_loop
+      if(old_cloud_loop_flag)then
       if(regen_fix) then   
          loop_up_bnd = pver - 1
       else
@@ -782,7 +786,7 @@ subroutine dropmixnuc( &
 
                factnum(i,k,:) = fn
                fn_bf_mix(i,k,:)=fn
-
+               flxn_bf_mix(i,k,:)=fluxn
                if (k < pver) then
                   dumc = cldn(i,k) - cldn(i,kp1)
                else
@@ -881,7 +885,7 @@ subroutine dropmixnuc( &
          end if
 
       end do  ! old_cloud_main_k_loop
-
+      end if
       ! switch nsav, nnew so that nnew is the updated aerosol
       ntemp = nsav
       nsav  = nnew
@@ -964,7 +968,7 @@ subroutine dropmixnuc( &
          end do
       end do
      
-      numliq_bf_mix(i,:)=qcld(:pver)
+      numliq_bf_mix(i,:)=qcld(:)
       nsource_bf_mix(i,:)=nsource(i,:)
 
       ! old_cloud_nsubmix_loop
@@ -1050,7 +1054,7 @@ subroutine dropmixnuc( &
          end do
 
       end do ! old_cloud_nsubmix_loop
-      numliq_af_mix(i,:)=qcld(:pver)
+      numliq_af_mix(i,:)=qcld(:)
       nsource_af_mix(i,:)=nsource(i,:)
       ! evaporate particles again if no cloud
 
@@ -1134,6 +1138,8 @@ subroutine dropmixnuc( &
    !! fore ndropmix
    write (tmpname, "(A5,I2.2)") "wtke_", macmic_it
    call outfld(trim(adjustl(tmpname)),   wtke, pcols, lchnk )
+   write (tmpname, "(A9,I2.2)") "wtke_cen_", macmic_it
+   call outfld(trim(adjustl(tmpname)),   wtke_cen, pcols, lchnk )
    
   !! for cloud fraction
    write (tmpname, "(A11,I2.2)") "cldfrc_new_", macmic_it
@@ -1144,20 +1150,20 @@ subroutine dropmixnuc( &
 
    !! for aerosol within mam mode factnum
    do m=1,ntot_amode
-   write(tmpname,"(A13,I1.1,A1,I2.2)")'fn_af_reg_mam',m,'_',macmic_it
-   call outfld(trim(adjustl(tmpname)),   fn_af_reg(:,:,m), pcols, lchnk )
+!   write(tmpname,"(A13,I1.1,A1,I2.2)")'fn_af_reg_mam',m,'_',macmic_it
+!   call outfld(trim(adjustl(tmpname)),   fn_af_reg(:,:,m), pcols, lchnk )
 
    write(tmpname,"(A13,I1.1,A1,I2.2)")'fn_bf_mix_mam',m,'_',macmic_it
    call outfld(trim(adjustl(tmpname)),   fn_bf_mix(:,:,m), pcols, lchnk )
+   write(tmpname,"(A15,I1.1,A1,I2.2)")'flxn_bf_mix_mam',m,'_',macmic_it
+   call outfld(trim(adjustl(tmpname)),   flxn_bf_mix(:,:,m), pcols, lchnk )
 
    write(tmpname,"(A11,I1.1,A1,I2.2)")'factnum_mam',m,'_',macmic_it
    call outfld(trim(adjustl(tmpname)),   factnum(:,:,m), pcols, lchnk )
 
-   write(tmpname,"(A16,I1.1,A1,I2.2)")'raero_af_reg_mam',m,'_',macmic_it
-   call outfld(trim(adjustl(tmpname)),   raero_af_reg(:,:,m), pcols, lchnk )
+ !  write(tmpname,"(A11,I1.1,A1,I2.2)")'raerfld_mam',m,'_',macmic_it
+ !  call outfld(trim(adjustl(tmpname)),   raerfld(:,:,m), pcols, lchnk )
 
-   write(tmpname,"(A15,I1.1,A1,I2.2)")'raero_cw_af_mam',m,'_',macmic_it
-   call outfld(trim(adjustl(tmpname)),   raero_cw_af_reg(:,:,m), pcols, lchnk )
 
    end do
 

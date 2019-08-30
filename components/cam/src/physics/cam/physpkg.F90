@@ -2134,8 +2134,8 @@ subroutine tphysbc (ztodt,               &
     type(physics_tend)    :: tend_sc          ! tend for sub-columns
 
     integer :: nstep                          ! current timestep number
-    integer :: ixnumliq,ixnpccn!! index; add temporary variable for MACMIC output
-    real(r8), pointer :: tmpnpccn(:,:)
+    integer :: ixnumliq,ixnpccn,ixalst!! index; add temporary variable for MACMIC output
+    real(r8), pointer :: tmpnpccn(:,:),tmpalst(:,:)
     real(r8):: tmpcldliq(pcols,pver),tmpnumliq(pcols,pver)!add temporary variable for MACMIC output
 
     character(200) :: npccnname                !String for npccn name at each sub step
@@ -2659,6 +2659,11 @@ end if
        prec_pcw_macmic = 0._r8
        snow_pcw_macmic = 0._r8
 
+       ixalst=pbuf_get_index('ALST')
+       write(npccnname,"(A14)")"alst_bf_macmic"
+       call pbuf_get_field(pbuf,ixalst,tmpalst)
+       call outfld(trim(adjustl(npccnname)),   tmpalst(:ncol,:pver), pcols, lchnk )
+
        do macmic_it = 1, cld_macmic_num_steps
        
         if (l_st_mac) then
@@ -2775,6 +2780,13 @@ end if
 
               call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
               call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+
+
+
+              ixalst=pbuf_get_index('ALST')
+              write(npccnname,"(A16,I2.2)")"alst_bf_micaero_",macmic_it
+              call pbuf_get_field(pbuf,ixalst,tmpalst)
+              call outfld(trim(adjustl(npccnname)),   tmpalst(:ncol,:pver), pcols, lchnk )
           end if !! end if macmic output npccn  
           !===================================================
           ! Calculate cloud microphysics 
@@ -2816,6 +2828,10 @@ end if
 
               call outfld(trim(adjustl(numliqname)),  tmpnumliq, pcols, lchnk )
               call outfld(trim(adjustl(cldliqname)),  tmpcldliq, pcols, lchnk )
+              ixalst=pbuf_get_index('ALST')
+              write(npccnname,"(A16,I2.2)")"alst_af_micaero_",macmic_it
+              call pbuf_get_field(pbuf,ixalst,tmpalst)
+              call outfld(trim(adjustl(npccnname)),   tmpalst(:ncol,:pver), pcols, lchnk )
           end if !! end if macmic output npccn   
 
           call t_startf('microp_tend')
@@ -2863,6 +2879,12 @@ end if
                snow_str(:ncol)/cld_macmic_num_steps, zero)
 
           call t_stopf('microp_tend')
+          if(macmic_extra_diag)then
+          ixalst=pbuf_get_index('ALST')
+              write(npccnname,"(A16,I2.2)")"alst_af_mg2tend_",macmic_it
+              call pbuf_get_field(pbuf,ixalst,tmpalst)
+              call outfld(trim(adjustl(npccnname)),   tmpalst(:ncol,:pver), pcols, lchnk )
+          end if    
 
         else
         ! If microphysics is off, set surface cloud liquid/ice and rain/snow fluxes to zero
@@ -2893,6 +2915,7 @@ end if
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
        end do ! end substepping over macrophysics/microphysics
+      
 
        prec_sed(:ncol) = prec_sed_macmic(:ncol)/cld_macmic_num_steps
        snow_sed(:ncol) = snow_sed_macmic(:ncol)/cld_macmic_num_steps
@@ -2902,6 +2925,10 @@ end if
        snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
      end if ! l_st_mic
+     ixalst=pbuf_get_index('ALST')
+       write(npccnname,"(A14)")"alst_af_macmic"
+       call pbuf_get_field(pbuf,ixalst,tmpalst)
+       call outfld(trim(adjustl(npccnname)),   tmpalst(:ncol,:pver), pcols, lchnk )
 
 if (l_tracer_aero) then
 
@@ -3238,13 +3265,14 @@ subroutine add_fld_extra_macmic_calls ()
   use phys_control,     only: phys_getopts
   implicit none
   integer           :: cld_macmic_num_steps
-  character(len=17), parameter :: vlist(19) = (/ 'npccn_bf_micaero ','npccn_af_micaero ','npccn_af_mg2tend ',&
+  character(len=17), parameter :: vlist(23) = (/ 'npccn_bf_micaero ','npccn_af_micaero ','npccn_af_mg2tend ',&
           'numliq_bf_micaero','numliq_af_micaero','numliq_af_mg2tend','cldliq_bf_micaero','cldliq_af_micaero',&
           'cldliq_af_mg2tend','numliq_bf_reg    ','numliq_af_reg    ','numliq_bf_mix    ','numliq_af_mix    ',&
           'nsource_af_reg   ','nsource_bf_mix   ','nsource_af_mix   ','cldfrc_new       ','cldfrc_old       ',&
-          'wtke             '/)
+          'wtke             ','wtke_cen         ','alst_bf_micaero  ','alst_af_micaero  ','alst_af_mg2tend  '/)
 
-!  character(len=10),parameter::vlist(3)  =(/'bf_micaero','af_micaero','af_mg2tend'/)
+ character (len=14), parameter :: vlist2(2) =(/"alst_af_macmic","alst_bf_macmic"/)!!no substepping variable
+  !  character(len=10),parameter::vlist(3)  =(/'bf_micaero','af_micaero','af_mg2tend'/)
   character(len=fieldname_len) :: varname
   character(len=2)::substep
   character(len=1000)          :: s_lngname,stend_lngname,qv_lngname,qvtend_lngname,t_lngname
@@ -3252,6 +3280,15 @@ subroutine add_fld_extra_macmic_calls ()
   integer :: it,ip, ntot, iv,m,ntot_amode
   call phys_getopts(cld_macmic_num_steps_out=cld_macmic_num_steps) 
   ntot = size(vlist)
+
+  do iv=1,2
+  varname=vlist2(iv)
+
+  call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'fraction', 'liquid cloud fraction',flag_xyfill=.true.)!The units and longname are dummy as it is for a test only
+  call add_default (trim(adjustl(varname)), 1, ' ')
+   enddo
+
+
   do it=1,cld_macmic_num_steps
   write(substep,"(I2.2)")it
   do iv=1, ntot
@@ -3266,22 +3303,62 @@ enddo
 do it=1,cld_macmic_num_steps
   !;write(substep,"(I2.2)")it
   do m=1,ntot_amode
-   write(varname,"(A13,I1.1,A1,I2.2)")'fn_af_reg_mam',m,'_',it
+!   write(varname,"(A13,I1.1,A1,I2.2)")'fn_af_reg_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+   write(varname,"(A13,I1.1,A1,I2.2)")'fn_bf_mix_mam',m,'_',it
    call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
    call add_default (trim(adjustl(varname)), 1, ' ')
-   write(varname,"(A13,I1.1,A1,I2.2)")'fn_bf_mix_mam',m,'_',it
+   
+   write(varname,"(A15,I1.1,A1,I2.2)")'flxn_bf_mix_mam',m,'_',it
    call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
    call add_default (trim(adjustl(varname)), 1, ' ')
 
    write(varname,"(A11,I1.1,A1,I2.2)")'factnum_mam',m,'_',it
    call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
    call add_default (trim(adjustl(varname)), 1, ' ')
-   write(varname,"(A16,I1.1,A1,I2.2)")'raero_af_reg_mam',m,'_',it
-   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
-   call add_default (trim(adjustl(varname)), 1, ' ')
-   write(varname,"(A15,I1.1,A1,I2.2)")'raero_cw_af_mam',m,'_',it
-   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
-   call add_default (trim(adjustl(varname)), 1, ' ')
+
+!   write(varname,"(A15,I1.1,A1,I2.2)")'raer_bf_reg_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A17,I1.1,A1,I2.2)")'raercw_bf_reg_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A15,I1.1,A1,I2.2)")'raer_af_reg_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A17,I1.1,A1,I2.2)")'raercw_af_reg_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A15,I1.1,A1,I2.2)")'raer_bf_mix_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A17,I1.1,A1,I2.2)")'raercw_bf_mix_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A15,I1.1,A1,I2.2)")'raer_af_mix_mam',m,'_',it
+!   call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+!
+!   write(varname,"(A17,I1.1,A1,I2.2)")'raercw_af_mix_mam',m,'_',it
+!call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+!   call add_default (trim(adjustl(varname)), 1, ' ')
+
+ !  write(varname,"(A11,I1.1,A1,I2.2)")'raerfld_mam',m,'_',it
+ !  call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+ !  call add_default (trim(adjustl(varname)), 1, ' ')
+  ! write(varname,"(A16,I1.1,A1,I2.2)")'raero_af_reg_mam',m,'_',it
+  ! call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+  ! call add_default (trim(adjustl(varname)), 1, ' ')
+  ! write(varname,"(A15,I1.1,A1,I2.2)")'raero_cw_af_mam',m,'_',it
+  ! call addfld (trim(adjustl(varname)), (/ 'lev' /), 'A', 'extramacmic_diag_units', 'extramacmic_diag_longname',flag_xyfill=.true.)
+  ! call add_default (trim(adjustl(varname)), 1, ' ')
   end do
 end do 
 
