@@ -2659,6 +2659,7 @@ end if
        prec_pcw_macmic = 0._r8
        snow_pcw_macmic = 0._r8
 
+       !!output the liquid cloud fraction before clubb+mg2 substepping
        ixalst=pbuf_get_index('ALST')
        write(npccnname,"(A14)")"alst_bf_macmic"
        call pbuf_get_field(pbuf,ixalst,tmpalst)
@@ -2925,6 +2926,8 @@ end if
        snow_str(:ncol) = snow_pcw(:ncol) + snow_sed(:ncol)
 
      end if ! l_st_mic
+
+     !!output liquid cloud fraction after clubb+mg2 substepping 
      ixalst=pbuf_get_index('ALST')
        write(npccnname,"(A14)")"alst_af_macmic"
        call pbuf_get_field(pbuf,ixalst,tmpalst)
