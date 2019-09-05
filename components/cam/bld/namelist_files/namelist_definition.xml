@@ -2761,11 +2761,6 @@ Default: FALSE
 Switch for output CLUBB initial conditions
 Default: FALSE
 </entry>
-<entry id="macmic_extra_diag" type="logical" category="conv"
-       group="phys_ctl_nl" valid_values="" >
-Switch for MACMIC substep diag
-Default: FALSE
-</entry>
 
 <entry id="do_aerocom_ind3" type="logical" category="conv"
        group="phys_ctl_nl" valid_values="" >
@@ -2870,6 +2865,39 @@ This is part of PNNL bug fixes under Polar project.It fixes the
 aerosol regeration bug in ndrop.F90
 Default: .false.
 </entry>
+
+<!-- Added flags to turn off progesses in aerosol activation-->
+<entry id="l_aerosol_mixing" type="logical" category="conv"
+       group="phys_ctl_nl" valid_values="" >
+This is used for test simulations in SciDAC project.It turns off 
+part of the aerosol activation processes in ndrop.F90
+Default: .false.
+</entry>
+
+<!-- Added flags to turn off progesses in aerosol activation-->
+<entry id="l_aerosol_cldgrow" type="logical" category="conv"
+       group="phys_ctl_nl" valid_values="" >
+This is used for test simulations in SciDAC project.It turns off         
+part of the aerosol activation processes in ndrop.F90       
+Default: .true.
+</entry>
+
+<!-- Added flags to turn off progesses in aerosol activation-->
+<entry id="l_aerosol_cldshnk" type="logical" category="conv"
+	group="phys_ctl_nl" valid_values="" >
+This is used for test simulations in SciDAC project.It turns off         
+part of the aerosol activation processes in ndrop.F90	
+Default: .true.
+</entry>
+
+<!-- Added flags to turn off progesses in aerosol activation-->
+<entry id="l_aerosol_oldcld" type="logical" category="conv"
+       group="phys_ctl_nl" valid_values="" >
+This is used for test simulations in SciDAC project.It turns off         
+part of the aerosol activation processes in ndrop.F90       
+Default: .true.
+</entry>
+
 
 <entry id="liqcf_fix" type="logical" category="conv"
        group="phys_ctl_nl" valid_values="" >
@@ -3887,6 +3915,19 @@ Default: .false.
 switch to turn on code instrumentations for running pergro test
 Default: .false.
 </entry>
+
+<entry id="macmic_extra_diag" type="logical"  category="perturbation"
+       group="phys_ctl_nl" valid_values="" >
+switch to turn on code instrumentations for extra output in clubb and mg2
+Default: .false.
+</entry>
+
+<entry id="tend_dribbling_macmic" type="logical"  category="perturbation"
+       group="phys_ctl_nl" valid_values="" >
+switch to use the dribbling tendency in clubb and mg2
+Default: .false.
+</entry>
+
 
 
 <!-- Flag to turn on/off amicphys codes -->
